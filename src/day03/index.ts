@@ -57,7 +57,6 @@ const part2 = (rawInput: string) => {
   const lines = input.split("\n");
   const maybeGears = {} as MaybeGears;
 
-  const parts: number[] = [];
   lines.forEach((line, row) => {
     let matches = [...line.matchAll(/(\d+)/g)];
     matches.forEach((match) => {
