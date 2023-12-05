@@ -104,7 +104,89 @@ const part1 = (rawInput: string) => {
   return _.min(locations);
 };
 
+type Range = [number, number];
+
+// Return a list of all the range starts in a category map.
+// Range starts are the numbers that start a new range within the map.
+// E.g.  {start: 0, length: 15}, {start: 15, length: 18}, {start: 52, length: 2},
+// -> [0, 15, 33, 52, 54]
+function getCategoryRangeStarts(categoryMap: CategoryMapRange[]): number[] {
+  const rangeStarts: number[] = [];
+  categoryMap.forEach((map) => {
+    rangeStarts.push(map.sourceRangeStart);
+    rangeStarts.push(map.sourceRangeStart + map.rangeLength);
+  });
+
+  // Uniq and sort. We have to uniq because we may double count
+  // end of previous with start of next when ranges are adjacent.
+  return _.uniq(_.sortBy(rangeStarts));
+}
+
+// Expand [start, end] range into its components based on the categoryRangeStarts.
+// E.g. [0, 30, 41, 50], [20, 60] -> [20, 29], [30, 40], [41, 49], [50, 60]
+function mapCategoryRange(
+  categoryRangeStarts: number[],
+  range: Range,
+): Range[] {
+  let [start, end] = range;
+  let startIndex = _.findIndex(categoryRangeStarts, (n) => n > start);
+  let endIndex = _.findIndex(categoryRangeStarts, (n) => n > end);
+
+  // The relevant range starts include our range's start and end+1
+  let rangeStarts = [
+    // 20
+    start,
+    // 30, 41, 50, 61
+    ...categoryRangeStarts.slice(startIndex, endIndex),
+    // 61, this is needed to simplify our loop below's logic.
+    end + 1,
+  ];
+
+  // Convert range starts into pairs of [start, end] ranges.
+  // [20,30,41,50,61] -> [20,29] [30,40] [41,49] [50,60]
+  const mappedRanges: Range[] = [];
+  for (let i = 0; i < rangeStarts.length - 1; i++) {
+    mappedRanges.push([rangeStarts[i], rangeStarts[i + 1] - 1]);
+  }
+
+  return mappedRanges;
+}
+
 const part2 = (rawInput: string) => {
+  const input = parseInput(rawInput);
+  const almanac = parseAlmanac(input);
+
+  // Seeds come in a single array of [start, length, start, length, etc].
+  // Convert this into pairs of [start, end] ranges.
+  let sourceRanges = _.chunk(almanac.seeds, 2).map(([start, length]) => [
+    start,
+    start + length - 1,
+  ]);
+
+  for (const category of CATEGORIES) {
+    const categoryMap = almanac[category];
+    const categoryRangeStarts = getCategoryRangeStarts(categoryMap);
+    // Expand source ranges into all the ranges they map to in each category.
+    sourceRanges = _.flatten(
+      sourceRanges.map((range) =>
+        mapCategoryRange(categoryRangeStarts, range as Range),
+      ),
+    );
+
+    // Convert to destination ranges.
+    sourceRanges = sourceRanges.map((range) => {
+      return [
+        mapCategory(categoryMap, range[0]),
+        mapCategory(categoryMap, range[1]),
+      ] as Range;
+    });
+  }
+
+  // At this point we have ranges of locations, so return the min.
+  return _.min(_.flatten(sourceRanges));
+};
+
+const part2_brute_force = (rawInput: string) => {
   const input = parseInput(rawInput);
   const almanac = parseAlmanac(input);
 
